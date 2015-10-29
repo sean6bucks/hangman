@@ -53,15 +53,15 @@ $(function(){
 	// GIVE ME A WORD
 	// -------------------------------
 	// WORD & GUESS VARIABLES
-	var word,
+	var currentWord,
 		letterToGuess,
-		possibleWords,
+		possibleAnswers,
 		// ALPHABET ARRANGED IN ORDER OF MOST COMMONLY USED
 		letters = [ 'E', 'S', 'I', 'A', 'R', 'N', 'T', 'O', 'L', 'C', 'D', 'U', 'P', 'M', 'Y', 'V', 'G', 'B', 'F', 'H', 'K', 'W', 'Z', 'X', 'Q', 'J' ];
 		
 	function giveMeAWord(){
 		letterToGuess = 0;
-		possibleWords = [],
+		possibleAnswers = [],
 		console.log( '%cFetching word...', consoleText );
 		// SEND AJAX REQUEST FOR WORD
 		$.ajax({
@@ -75,22 +75,22 @@ $(function(){
 			// HANDLE WORD RESPONSE
 			success: function( response ){
 				console.log( '%cAJAX Successful: ', successText, response );
-				word = response.data.word;
+				currentWord = response.data.word;
 				
-				var wordlength = ( word.match(/\*/gi ) || [] ).length;
+				var wordLength = ( currentWord.match(/\*/gi ) || [] ).length;
 				
 				// BUILD POSSIBLE WORDS BASED ON LENGTH
-				$.map( allWords, function( val, index ){
-					if ( val.length === wordlength ){
-						possibleWords.push( val );
+				$.map( allWords, function( word, index ){
+					if ( word.length === wordLength ){
+						possibleAnswers.push( word );
 					}
 				});
 
-				console.log( possibleWords );
+				console.log( possibleAnswers );
 
 				// DISPLAY GAME PROMPTS
 				console.log( '%cWORD #' + response.data.totalWordCount, gameHeader );
-				console.log( '%cThe word is ' + word , gameText );
+				console.log( '%cThe word is ' + currentWord , gameText );
 
 				// START GUESSING THE WORD
 				if ( response.data.totalWordCount === 80 ) {
@@ -126,7 +126,7 @@ $(function(){
 
 				console.log( '%cAJAX Successful: ', successText, response );
 
-				var prevLetters = ( word.match(/\*/gi) || [] ).length,
+				var prevLetters = ( currentWord.match(/\*/gi) || [] ).length,
 					lettersLeft = ( (response.data.word).match(/\*/gi) || [] ).length;
 
 				console.log( '%cYou guessed "'+letters[letterToGuess]+'"', gameText);
@@ -144,12 +144,10 @@ $(function(){
 				}
 				else {
 
-					word = response.data.word;
+					currentWord = response.data.word;
 
-					findPossibleWords( prevLetters, lettersLeft, word );
+					findPossibleAnswers( prevLetters, lettersLeft, currentWord );
 
-					letterToGuess++;
-					makeAGuess();
 				}
 			},
 			error: function( response ){
@@ -200,34 +198,36 @@ $(function(){
 		});
 	};
 
-	function findPossibleWords( prevLetters, lettersLeft, word){
+	function findPossibleAnswers( prevLetters, lettersLeft, word){
 
-		var arr = [];
-		var reg = new RegExp( letters[letterToGuess].toLowerCase() );
+		var arr = [],
+			letterReg = new RegExp( letters[letterToGuess].toLowerCase() ),
+			wordReg = word.replace( /\*/gi, "[a-z]"),
+			wordReg = new RegExp( wordReg );
 
 		if ( lettersLeft !== prevLetters ) {
-
-			$.map( possibleWords, function( val, index ){
-				if ( ( val.match(reg) || [] ).length > 0 ) {
-					arr.push( val );
+			console.log( typeof wordReg );
+			$.map( possibleAnswers, function( answer, index ){
+				if ( answer.search( wordReg ) >= 0 ) {
+					arr.push( answer );
 				}
 			});
-
-			possibleWords = arr;
-
-			console.log( possibleWords );
 
 		} else {
 
-			$.map( possibleWords, function( val, index ){
-				if ( ( val.match(reg) || [] ).length === 0 ) {
-					arr.push( val );
+			$.map( possibleAnswers, function( answer, index ){
+				if ( ( answer.match( letterReg ) || [] ).length === 0 ) {
+					arr.push( answer );
 				}
 			});
 
-			possibleWords = arr;
-
 		}
+
+		possibleAnswers = arr;
+		console.log( possibleAnswers );
+
+		letterToGuess++;
+		makeAGuess();
 
 	};
 });
