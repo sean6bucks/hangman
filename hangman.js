@@ -45,7 +45,7 @@ $(function(){
 
 			},
 			error: function( response ){
-				console.log( '%cAJAX Error: ', response.message);
+				console.log( '%cAJAX Error: ', errorText, response.responseJSON.message );
 				//TODO: Handle errors
 			}
 		});
@@ -54,13 +54,12 @@ $(function(){
 	// -------------------------------
 	// WORD & GUESS VARIABLES
 	var currentWord,
-		letterToGuess,
 		possibleAnswers,
+		lastWord,
 		// ALPHABET ARRANGED IN ORDER OF MOST COMMONLY USED
-		letters = [ 'E', 'S', 'I', 'A', 'R', 'N', 'T', 'O', 'L', 'C', 'D', 'U', 'P', 'M', 'Y', 'V', 'G', 'B', 'F', 'H', 'K', 'W', 'Z', 'X', 'Q', 'J' ];
+		letters = [];
 		
 	function giveMeAWord(){
-		letterToGuess = 0;
 		possibleAnswers = [],
 		console.log( '%cFetching word...', consoleText );
 		// SEND AJAX REQUEST FOR WORD
@@ -86,21 +85,24 @@ $(function(){
 					}
 				});
 
+				// SET FIRST GUESS TO 'A' IF UNDER 5, 'E' IF OVER
+				letters = ( wordLength < 6 ) ? ['A'] : ['E'] ;
+
 				console.log( possibleAnswers );
 
 				// DISPLAY GAME PROMPTS
 				console.log( '%cWORD #' + response.data.totalWordCount, gameHeader );
 				console.log( '%cThe word is ' + currentWord , gameText );
 
-				// START GUESSING THE WORD
+				// START GUESSING THE WORD > IF LAST WORD SET LAST
 				if ( response.data.totalWordCount === 80 ) {
-					makeAGuess( true );
-				} else {
-					makeAGuess();
-				}
+					lastWord = true;
+				} 
+
+				makeAGuess();
 			},
 			error: function( response ){
-				console.log( '%cAJAX Error: ', response.message);
+				console.log( '%cAJAX Error: ', errorText, response.responseJSON.message );
 				//TODO: Handle errors
 			}
 		});
@@ -108,7 +110,7 @@ $(function(){
 
 	// MAKE A GUESS
 	// -------------------------------
-	function makeAGuess( last ){
+	function makeAGuess(){
 		
 		console.log( '%cSending guess...', consoleText );
 		
@@ -120,7 +122,7 @@ $(function(){
 			data: JSON.stringify({
 				sessionId: sessionId,
 				action: 'guessWord',
-				guess: letters[letterToGuess]
+				guess: letters[letters.length - 1]
 			}),
 			success: function( response ){
 
@@ -129,29 +131,37 @@ $(function(){
 				var prevLetters = ( currentWord.match(/\*/gi) || [] ).length,
 					lettersLeft = ( (response.data.word).match(/\*/gi) || [] ).length;
 
-				console.log( '%cYou guessed "'+letters[letterToGuess]+'"', gameText);
+				console.log( '%cYou guessed "'+letters[letters.length - 1]+'"', gameText);
 
 				console.log( '%c' + response.data.word, gameText);
 
 				if ( lettersLeft === 0 ) {
 					console.log( '%cYOU GOT IT!', successText);
-					if ( last === true ) { getYourResults(); }
-					else { giveMeAWord(); }
+					if ( lastWord ) { 
+						getYourResults(); 
+					}
+					else { 
+						giveMeAWord(); 
+					}
 				} else if ( response.data.wrongGuessCountOfCurrentWord === 10 ){
 					console.log( '%cSORRY! Out of turns.', errorText);
-					if ( last === true ) { getYourResults(); }
-					else { giveMeAWord(); }
+					if ( lastWord ) { 
+						getYourResults(); 
+					}
+					else { 
+						giveMeAWord(); 
+					}
 				}
 				else {
 
 					currentWord = response.data.word;
 
-					findPossibleAnswers( prevLetters, lettersLeft, currentWord );
+					findPossibleAnswers( prevLetters, lettersLeft, currentWord, letters[letters.length - 1] );
 
 				}
 			},
 			error: function( response ){
-				console.log( '%cAJAX Error: ', response.message);
+				console.log( '%cAJAX Error: ', errorText, response.responseJSON.message );
 				//TODO: Handle errors
 			}
 		});
@@ -162,7 +172,7 @@ $(function(){
 
 	function getYourResults(){
 	// SEND REQUEST FOR RESULTS
-		console.log( '%cSending guess...', consoleText );
+		console.log( '%cGetting Results...', consoleText );
 		// SEND REQUEST WITH GUESS DATA
 		$.ajax({
 			url: 'https://strikingly-hangman.herokuapp.com/game/on',
@@ -173,17 +183,22 @@ $(function(){
 				action: 'getResult',
 			}),
 			success: function( response ){
-				console.log( '%cYour Current Score: ' + response.data.score, gameHeader);
-				if ( response.data.score > 800 ) {
-					submitResult();
+				console.log( '%cYour Final Score: ' + response.data.score, gameHeader);
+				if ( response.data.score > 1200 ) {
+					// submitYourResult();
+					return;
 				} else {
-					startGame();
+					// startGame();
+					return;
 				}
+			},
+			error: function( response ){
+				console.log( '%cAJAX Error: ', errorText, response.responseJSON.message );
 			}
 		});
 	};
 
-	function submitYourRequest(){
+	function submitYourResult(){
 		$.ajax({
 			url: 'https://strikingly-hangman.herokuapp.com/game/on',
 			type: 'POST',
@@ -193,41 +208,65 @@ $(function(){
 				action: 'submitResult',
 			}),
 			success: function( response ){
-				console( '%cFINAL SCORE: ' + response.data.score, gameHeader );
+				console( '%cYour Score has Been Submitted!' + response.data, gameHeader );
 			},
+			error: function( response ){
+				console.log( '%cAJAX Error: ', errorText, response.responseJSON.message );
+			}
 		});
 	};
 
-	function findPossibleAnswers( prevLetters, lettersLeft, word){
+	function findPossibleAnswers( prevLetters, lettersLeft, word, letterGuessed){
 
 		var arr = [],
-			letterReg = new RegExp( letters[letterToGuess].toLowerCase() ),
+			letterReg = new RegExp( letterGuessed.toLowerCase() ),
 			wordReg = word.replace( /\*/gi, "[a-z]"),
-			wordReg = new RegExp( wordReg );
+			wordReg = new RegExp( wordReg.toLowerCase() );
 
 		if ( lettersLeft !== prevLetters ) {
-			console.log( typeof wordReg );
 			$.map( possibleAnswers, function( answer, index ){
-				if ( answer.search( wordReg ) >= 0 ) {
+				if ( wordReg.test( answer ) ) {
 					arr.push( answer );
 				}
 			});
-
 		} else {
-
 			$.map( possibleAnswers, function( answer, index ){
 				if ( ( answer.match( letterReg ) || [] ).length === 0 ) {
 					arr.push( answer );
 				}
 			});
-
 		}
 
 		possibleAnswers = arr;
 		console.log( possibleAnswers );
 
-		letterToGuess++;
-		makeAGuess();
-
+		findNextLetter( possibleAnswers );
 	};
+
+	function findNextLetter( possibleAnswers ) {
+		var allLetters = possibleAnswers.join(''),
+			letterCount = {},
+			mostFreq = '';
+
+		for( var i = 0; i < allLetters.length; i++ ) {
+			
+			var letter = allLetters[i];
+			if( !letterCount[letter] ){
+		    	letterCount[letter] = 0;
+			}
+
+			letterCount[letter]++;
+			// IF LETTER HAS BEEN GUESSED, VALUE ZERO
+			if( letters.indexOf( letter.toUpperCase() ) > -1 ) {
+				letterCount[letter] = 0;
+			};
+			if( mostFreq === '' || letterCount[letter] > letterCount[mostFreq] ){
+		        mostFreq = letter;
+			}
+		}
+
+		letters.push( mostFreq.toUpperCase() );
+
+		makeAGuess();
+	}
 });
